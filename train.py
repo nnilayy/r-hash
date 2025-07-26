@@ -250,6 +250,8 @@ def main():
     kf = KFold(n_splits=KFOLDS, shuffle=True, random_state=SEED_VAL)
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(range(len(y_full)))):
+        if fold < 3:
+            continue
         print(f"\nFold {fold + 1}/{KFOLDS}")
 
         X_train = X_full[train_idx]
