@@ -350,7 +350,6 @@ class EEGAugmentationSuite:
         """Conservative augmentation preset."""
         x = self.gaussian_noise(x, noise_std=0.01)
         x = self.amplitude_scaling(x, scale_range=(0.95, 1.05))
-        x = self.channel_dropout(x, dropout_prob=0.05)
         return x
     
     def moderate_augmentation(self, x: np.ndarray) -> np.ndarray:
@@ -484,8 +483,6 @@ AUGMENTATION_CONFIGS = {
     'conservative': {
         'gaussian_noise': True,
         'gaussian_noise_params': {'noise_std': 0.01},
-        'channel_dropout': True,
-        'channel_dropout_params': {'dropout_prob': 0.05},
         'amplitude_scaling': True,
         'amplitude_scaling_params': {'scale_range': (0.95, 1.05)}
     },

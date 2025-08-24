@@ -147,7 +147,7 @@ def main():
     MINIMUM_LEARNING_RATE = 1e-5
 
     # Weight decay for regularization
-    WEIGHT_DECAY = 1e-3
+    WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
     LABEL_SMOOTHING = 0.12
 
