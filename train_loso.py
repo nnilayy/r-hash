@@ -11,8 +11,7 @@ from utils.seed import set_seed
 from huggingface_hub import login
 from model.model import RBTransformer
 from torch.utils.data import DataLoader
-from imblearn.over_sampling import SMOTE
-from sklearn.model_selection import KFold, LeaveOneGroupOut
+from sklearn.model_selection import LeaveOneGroupOut
 from utils.push_to_hf import push_model_to_hub
 import torch.optim.lr_scheduler as lr_scheduler
 from utils.messages import success, fail
@@ -131,8 +130,7 @@ def main():
     # Number of training epochs
     NUM_EPOCHS = 300
 
-    # Number of folds for K-FoldCV
-    KFOLDS = 5
+    # (Removed K-Fold; using pure LOSO)
 
     # Initial batch size, First half of training
     INITIAL_BATCH_SIZE = 256
@@ -147,10 +145,11 @@ def main():
     MINIMUM_LEARNING_RATE = 1e-6
 
     # Weight decay for regularization
-    WEIGHT_DECAY = 1e-3
+    # Increased weight decay for stronger regularization
+    WEIGHT_DECAY = 5e-3
 
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.0
+    LABEL_SMOOTHING = 0.0  # retained (not used in focal loss)
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -186,7 +185,17 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.1
+    # Increased dropout
+    DROPOUT = 0.3
+
+    # Focal loss gamma
+    FOCAL_GAMMA = 2.0
+
+    # EMA decay
+    EMA_DECAY = 0.999
+
+    # Gradient clipping max norm
+    GRAD_CLIP_MAX_NORM = 1.0
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
@@ -262,6 +271,64 @@ def main():
     
     print(success(f"LOSO Cross-Validation: {n_splits} subjects, {len(np.unique(groups))} unique subjects"))
 
+    # ------------------------------
+    # Helper: Focal Loss
+    # ------------------------------
+    class FocalLoss(nn.Module):
+        def __init__(self, weight=None, gamma: float = 2.0, reduction: str = "mean"):
+            super().__init__()
+            self.weight = weight
+            self.gamma = gamma
+            self.reduction = reduction
+
+        def forward(self, logits, targets):
+            ce = torch.nn.functional.cross_entropy(
+                logits, targets, weight=self.weight, reduction="none"
+            )
+            pt = torch.exp(-ce)
+            focal = (1 - pt) ** self.gamma * ce
+            if self.reduction == "mean":
+                return focal.mean()
+            elif self.reduction == "sum":
+                return focal.sum()
+            return focal
+
+    # ------------------------------
+    # Helper: Exponential Moving Average (EMA) Wrapper
+    # ------------------------------
+    class ModelEMA:
+        def __init__(self, model: nn.Module, decay: float = 0.999):
+            self.ema_model = self._clone(model)
+            self.decay = decay
+            self.num_updates = 0
+
+        def _clone(self, model):
+            ema_model = type(model)(
+                num_electrodes=model.num_electrodes,
+                bde_dim=model.bde_dim,
+                embed_dim=model.embed_dim,
+                depth=model.depth,
+                heads=model.heads,
+                head_dim=model.head_dim,
+                mlp_hidden_dim=model.mlp_hidden_dim,
+                dropout=model.dropout,
+                num_classes=model.num_classes,
+            )
+            ema_model.load_state_dict(model.state_dict())
+            for p in ema_model.parameters():
+                p.requires_grad_(False)
+            ema_model.to(model.device)
+            return ema_model
+
+        @torch.no_grad()
+        def update(self, model):
+            self.num_updates += 1
+            d = self.decay
+            msd = model.state_dict()
+            for k, v in self.ema_model.state_dict().items():
+                if v.dtype.is_floating_point:
+                    v.copy_(v * d + (1.0 - d) * msd[k])
+
     for fold, (train_idx, val_idx) in enumerate(logo.split(X_full, y_full, groups)):
         held_out_subject = groups[val_idx[0]]  # Which subject is held out
         print(f"\nFold {fold + 1}/{n_splits} - Testing on Subject {held_out_subject}")
@@ -271,13 +338,14 @@ def main():
         X_val = X_full[val_idx]
         y_val = y_full[val_idx]
 
-        # Applying SMOTE to the training set
-        smote = SMOTE(random_state=SEED_VAL)
-        X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
+        # Class weights (inverse frequency) for focal loss
+        unique_classes, counts = np.unique(y_train, return_counts=True)
+        class_weight_arr = np.zeros(NUM_CLASSES, dtype=np.float32)
+        for cls, cnt in zip(unique_classes, counts):
+            class_weight_arr[int(cls)] = len(y_train) / (NUM_CLASSES * cnt)
+        class_weight_tensor = torch.tensor(class_weight_arr, dtype=torch.float32).to(DEVICE)
 
-        train_dataset = DatasetReshape(
-            X_train_balanced, y_train_balanced, NUM_ELECTRODES
-        )
+        train_dataset = DatasetReshape(X_train, y_train, NUM_ELECTRODES)
         val_dataset = DatasetReshape(X_val, y_val, NUM_ELECTRODES)
 
         # balanced_counts = Counter(y_train_balanced)
@@ -310,13 +378,23 @@ def main():
         model = model.to(DEVICE)
 
         # loss, optimizer, and scheduler
-        criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
+        # Focal loss with class weighting
+        criterion = FocalLoss(weight=class_weight_tensor, gamma=FOCAL_GAMMA)
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
-        scheduler = lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=NUM_EPOCHS, eta_min=MINIMUM_LEARNING_RATE
+        # Scheduler switched to ReduceLROnPlateau (monitor val_loss)
+        scheduler = lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.5,
+            patience=10,
+            min_lr=MINIMUM_LEARNING_RATE,
+            verbose=False,
         )
+
+        # Initialize EMA
+        ema_helper = ModelEMA(model, decay=EMA_DECAY)
 
         # Init WandB for current fold
         wandb.init(
@@ -366,14 +444,16 @@ def main():
                 outputs = model(x)
                 loss = criterion(outputs, y)
                 loss.backward()
+                # Gradient clipping
+                torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP_MAX_NORM)
                 optimizer.step()
+                # EMA update
+                ema_helper.update(model)
 
                 train_loss += loss.item()
                 _, predicted = torch.max(outputs, 1)
                 train_total += y.size(0)
                 train_correct += (predicted == y).sum().item()
-
-            scheduler.step()
 
             train_accuracy = train_correct / train_total
             avg_train_loss = train_loss / len(train_loader)
@@ -384,11 +464,12 @@ def main():
             all_preds = []
             all_targets = []
 
+            # Use EMA weights for validation inference
             with torch.no_grad():
                 for batch in val_loader:
                     x, y = batch
                     x, y = x.to(DEVICE), y.to(DEVICE)
-                    outputs = model(x)
+                    outputs = ema_helper.ema_model(x)
                     loss = criterion(outputs, y)
                     val_loss += loss.item()
                     _, predicted = torch.max(outputs, 1)
@@ -397,6 +478,9 @@ def main():
                     all_targets.extend(y.cpu().numpy())
 
             avg_val_loss = val_loss / len(val_loader)
+
+            # Scheduler step with monitored metric
+            scheduler.step(avg_val_loss)
 
             # Calculate eval metrics
             val_accuracy = accuracy_score(all_targets, all_preds)
@@ -421,6 +505,14 @@ def main():
                     "f1_score": f1,
                     "lr": optimizer.param_groups[0]["lr"],
                     "train_batch_size": current_batch_size,
+                    "class_weights": class_weight_arr.tolist(),
+                    "scheduler_metric": avg_val_loss,
+                    "ema_decay": EMA_DECAY,
+                    "focal_gamma": FOCAL_GAMMA,
+                    "grad_clip_max_norm": GRAD_CLIP_MAX_NORM,
+                    "dropout": DROPOUT,
+                    "weight_decay": WEIGHT_DECAY,
+                    "loss_type": "FocalLoss",
                 }
             )
 
@@ -434,6 +526,8 @@ def main():
             tqdm.write(f"Recall         : {recall:.4f}")
             tqdm.write(f"F1 Score       : {f1:.4f}")
             tqdm.write(f"Learning Rate  : {optimizer.param_groups[0]['lr']:.6f}")
+            tqdm.write(f"LR Scheduler Metric (val_loss): {avg_val_loss:.4f}")
+            tqdm.write(f"Current Class Weights: {np.round(class_weight_arr, 3)}")
             tqdm.write(f"Batch Size     : {current_batch_size}")
 
         # Push model to Hub
