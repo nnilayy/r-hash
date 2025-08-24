@@ -303,21 +303,23 @@ def main():
             self.num_updates = 0
 
         def _clone(self, model):
+            cfg = getattr(model, 'config', {})
             ema_model = type(model)(
-                num_electrodes=model.num_electrodes,
-                bde_dim=model.bde_dim,
-                embed_dim=model.embed_dim,
-                depth=model.depth,
-                heads=model.heads,
-                head_dim=model.head_dim,
-                mlp_hidden_dim=model.mlp_hidden_dim,
-                dropout=model.dropout,
-                num_classes=model.num_classes,
+                num_electrodes=cfg.get("num_electrodes"),
+                bde_dim=cfg.get("bde_dim"),
+                embed_dim=cfg.get("embed_dim"),
+                depth=cfg.get("depth"),
+                heads=cfg.get("heads"),
+                head_dim=cfg.get("head_dim"),
+                mlp_hidden_dim=cfg.get("mlp_hidden_dim"),
+                dropout=cfg.get("dropout"),
+                num_classes=cfg.get("num_classes"),
             )
             ema_model.load_state_dict(model.state_dict())
             for p in ema_model.parameters():
                 p.requires_grad_(False)
-            ema_model.to(model.device)
+            device = next(model.parameters()).device
+            ema_model.to(device)
             return ema_model
 
         @torch.no_grad()
@@ -390,7 +392,6 @@ def main():
             factor=0.5,
             patience=10,
             min_lr=MINIMUM_LEARNING_RATE,
-            verbose=False,
         )
 
         # Initialize EMA
