@@ -11,12 +11,14 @@ from utils.seed import set_seed
 from huggingface_hub import login
 from model.model import RBTransformer
 from torch.utils.data import DataLoader
+from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import LeaveOneGroupOut
 from utils.push_to_hf import push_model_to_hub
 import torch.optim.lr_scheduler as lr_scheduler
 from utils.messages import success, fail
 from utils.pickle_patch import patch_pickle_loading
 from preprocessing.transformations import DatasetReshape
+from dataset_augmentations import AugmentedDatasetReshape, MixupAugmentedDataset
 from utils.auto_detect import get_num_electrodes, get_num_classes
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
@@ -145,17 +147,22 @@ def main():
     MINIMUM_LEARNING_RATE = 1e-6
 
     # Weight decay for regularization
-    # Increased weight decay for stronger regularization
-    WEIGHT_DECAY = 5e-3
+    WEIGHT_DECAY = 1e-3
 
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.0  # retained (not used in focal loss)
+    LABEL_SMOOTHING = 0.0
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
 
     # % of data to randomly drop for regularization
     DATA_DROP_RATIO = 0.10
+
+    # AUGMENTATION CONFIG
+    ENABLE_AUGMENTATIONS = True
+    AUGMENTATION_TYPE = "moderate"  # Options: "conservative", "moderate", "aggressive"
+    ENABLE_MIXUP = True  # Cross-subject mixup
+    REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # If True, removes SMOTE
 
     ################################################################################
     # MODEL-CONFIG
@@ -185,17 +192,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    # Increased dropout
-    DROPOUT = 0.3
-
-    # Focal loss gamma
-    FOCAL_GAMMA = 2.0
-
-    # EMA decay
-    EMA_DECAY = 0.999
-
-    # Gradient clipping max norm
-    GRAD_CLIP_MAX_NORM = 1.0
+    DROPOUT = 0.1
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
@@ -271,65 +268,7 @@ def main():
     
     print(success(f"LOSO Cross-Validation: {n_splits} subjects, {len(np.unique(groups))} unique subjects"))
 
-    # ------------------------------
-    # Helper: Focal Loss
-    # ------------------------------
-    class FocalLoss(nn.Module):
-        def __init__(self, weight=None, gamma: float = 2.0, reduction: str = "mean"):
-            super().__init__()
-            self.weight = weight
-            self.gamma = gamma
-            self.reduction = reduction
-
-        def forward(self, logits, targets):
-            ce = torch.nn.functional.cross_entropy(
-                logits, targets, weight=self.weight, reduction="none"
-            )
-            pt = torch.exp(-ce)
-            focal = (1 - pt) ** self.gamma * ce
-            if self.reduction == "mean":
-                return focal.mean()
-            elif self.reduction == "sum":
-                return focal.sum()
-            return focal
-
-    # ------------------------------
-    # Helper: Exponential Moving Average (EMA) Wrapper
-    # ------------------------------
-    class ModelEMA:
-        def __init__(self, model: nn.Module, decay: float = 0.999):
-            self.ema_model = self._clone(model)
-            self.decay = decay
-            self.num_updates = 0
-
-        def _clone(self, model):
-            cfg = getattr(model, 'config', {})
-            ema_model = type(model)(
-                num_electrodes=cfg.get("num_electrodes"),
-                bde_dim=cfg.get("bde_dim"),
-                embed_dim=cfg.get("embed_dim"),
-                depth=cfg.get("depth"),
-                heads=cfg.get("heads"),
-                head_dim=cfg.get("head_dim"),
-                mlp_hidden_dim=cfg.get("mlp_hidden_dim"),
-                dropout=cfg.get("dropout"),
-                num_classes=cfg.get("num_classes"),
-            )
-            ema_model.load_state_dict(model.state_dict())
-            for p in ema_model.parameters():
-                p.requires_grad_(False)
-            device = next(model.parameters()).device
-            ema_model.to(device)
-            return ema_model
-
-        @torch.no_grad()
-        def update(self, model):
-            self.num_updates += 1
-            d = self.decay
-            msd = model.state_dict()
-            for k, v in self.ema_model.state_dict().items():
-                if v.dtype.is_floating_point:
-                    v.copy_(v * d + (1.0 - d) * msd[k])
+    # (Removed focal loss & EMA helpers; reverting to plain CrossEntropy)
 
     for fold, (train_idx, val_idx) in enumerate(logo.split(X_full, y_full, groups)):
         held_out_subject = groups[val_idx[0]]  # Which subject is held out
@@ -340,14 +279,54 @@ def main():
         X_val = X_full[val_idx]
         y_val = y_full[val_idx]
 
-        # Class weights (inverse frequency) for focal loss
-        unique_classes, counts = np.unique(y_train, return_counts=True)
-        class_weight_arr = np.zeros(NUM_CLASSES, dtype=np.float32)
-        for cls, cnt in zip(unique_classes, counts):
-            class_weight_arr[int(cls)] = len(y_train) / (NUM_CLASSES * cnt)
-        class_weight_tensor = torch.tensor(class_weight_arr, dtype=torch.float32).to(DEVICE)
+        # Extract subject IDs for training set (for mixup)
+        groups_train = groups[train_idx]
 
-        train_dataset = DatasetReshape(X_train, y_train, NUM_ELECTRODES)
+        # Data balancing: SMOTE vs Augmentations
+        if REPLACE_SMOTE_WITH_AUGMENTATIONS:
+            # Use augmentations instead of SMOTE
+            print(f"Using augmentations instead of SMOTE for balancing")
+            X_train_balanced, y_train_balanced = X_train, y_train
+            groups_train_balanced = groups_train
+        else:
+            # Apply SMOTE to the training set (original approach)
+            smote = SMOTE(random_state=SEED_VAL)
+            X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
+            # Extend subject groups to match SMOTE-balanced data
+            groups_train_balanced = np.repeat(groups_train, 
+                                            len(y_train_balanced) // len(y_train))
+
+        # Create augmented datasets
+        if ENABLE_AUGMENTATIONS:
+            if ENABLE_MIXUP:
+                print(f"Creating MixupAugmentedDataset with {AUGMENTATION_TYPE} augmentations")
+                train_dataset = MixupAugmentedDataset(
+                    X_train_balanced, 
+                    y_train_balanced,
+                    groups_train_balanced,
+                    num_electrodes=NUM_ELECTRODES,
+                    apply_augmentations=True,
+                    augmentation_config=AUGMENTATION_TYPE,
+                    enable_mixup=True,
+                    seed=SEED_VAL
+                )
+            else:
+                print(f"Creating AugmentedDatasetReshape with {AUGMENTATION_TYPE} augmentations")
+                train_dataset = AugmentedDatasetReshape(
+                    X_train_balanced, 
+                    y_train_balanced, 
+                    num_electrodes=NUM_ELECTRODES,
+                    apply_augmentations=True,
+                    augmentation_config=AUGMENTATION_TYPE,
+                    seed=SEED_VAL
+                )
+        else:
+            # Original dataset without augmentations
+            train_dataset = DatasetReshape(
+                X_train_balanced, y_train_balanced, NUM_ELECTRODES
+            )
+
+        # Validation dataset (always without augmentations)
         val_dataset = DatasetReshape(X_val, y_val, NUM_ELECTRODES)
 
         # balanced_counts = Counter(y_train_balanced)
@@ -380,22 +359,13 @@ def main():
         model = model.to(DEVICE)
 
         # loss, optimizer, and scheduler
-        # Focal loss with class weighting
-        criterion = FocalLoss(weight=class_weight_tensor, gamma=FOCAL_GAMMA)
+        criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
-        # Scheduler switched to ReduceLROnPlateau (monitor val_loss)
-        scheduler = lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode="min",
-            factor=0.5,
-            patience=10,
-            min_lr=MINIMUM_LEARNING_RATE,
+        scheduler = lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=NUM_EPOCHS, eta_min=MINIMUM_LEARNING_RATE
         )
-
-        # Initialize EMA
-        ema_helper = ModelEMA(model, decay=EMA_DECAY)
 
         # Init WandB for current fold
         wandb.init(
@@ -413,6 +383,10 @@ def main():
                 "fold": fold + 1,
                 "optimizer": "AdamW",
                 "scheduler": "CosineAnnealingLR",
+                "augmentations_enabled": ENABLE_AUGMENTATIONS,
+                "augmentation_type": AUGMENTATION_TYPE if ENABLE_AUGMENTATIONS else None,
+                "mixup_enabled": ENABLE_MIXUP if ENABLE_AUGMENTATIONS else False,
+                "smote_replaced_by_augmentations": REPLACE_SMOTE_WITH_AUGMENTATIONS,
             },
         )
 
@@ -445,11 +419,7 @@ def main():
                 outputs = model(x)
                 loss = criterion(outputs, y)
                 loss.backward()
-                # Gradient clipping
-                torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP_MAX_NORM)
                 optimizer.step()
-                # EMA update
-                ema_helper.update(model)
 
                 train_loss += loss.item()
                 _, predicted = torch.max(outputs, 1)
@@ -465,12 +435,11 @@ def main():
             all_preds = []
             all_targets = []
 
-            # Use EMA weights for validation inference
             with torch.no_grad():
                 for batch in val_loader:
                     x, y = batch
                     x, y = x.to(DEVICE), y.to(DEVICE)
-                    outputs = ema_helper.ema_model(x)
+                    outputs = model(x)
                     loss = criterion(outputs, y)
                     val_loss += loss.item()
                     _, predicted = torch.max(outputs, 1)
@@ -479,9 +448,7 @@ def main():
                     all_targets.extend(y.cpu().numpy())
 
             avg_val_loss = val_loss / len(val_loader)
-
-            # Scheduler step with monitored metric
-            scheduler.step(avg_val_loss)
+            scheduler.step()
 
             # Calculate eval metrics
             val_accuracy = accuracy_score(all_targets, all_preds)
@@ -506,14 +473,11 @@ def main():
                     "f1_score": f1,
                     "lr": optimizer.param_groups[0]["lr"],
                     "train_batch_size": current_batch_size,
-                    "class_weights": class_weight_arr.tolist(),
-                    "scheduler_metric": avg_val_loss,
-                    "ema_decay": EMA_DECAY,
-                    "focal_gamma": FOCAL_GAMMA,
-                    "grad_clip_max_norm": GRAD_CLIP_MAX_NORM,
                     "dropout": DROPOUT,
                     "weight_decay": WEIGHT_DECAY,
-                    "loss_type": "FocalLoss",
+                    "loss_type": "CrossEntropyLoss",
+                    "augmentations_enabled": ENABLE_AUGMENTATIONS,
+                    "augmentation_type": AUGMENTATION_TYPE if ENABLE_AUGMENTATIONS else "none",
                 }
             )
 
@@ -527,8 +491,7 @@ def main():
             tqdm.write(f"Recall         : {recall:.4f}")
             tqdm.write(f"F1 Score       : {f1:.4f}")
             tqdm.write(f"Learning Rate  : {optimizer.param_groups[0]['lr']:.6f}")
-            tqdm.write(f"LR Scheduler Metric (val_loss): {avg_val_loss:.4f}")
-            tqdm.write(f"Current Class Weights: {np.round(class_weight_arr, 3)}")
+            # (Removed focal/EMA logging)            
             tqdm.write(f"Batch Size     : {current_batch_size}")
 
         # Push model to Hub
