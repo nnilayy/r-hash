@@ -159,7 +159,7 @@ def main():
 
     # AUGMENTATION CONFIG 
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
+    AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
     ENABLE_MIXUP = False  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE + augmentations
 
@@ -191,7 +191,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.1
+    DROPOUT = 0.25
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
@@ -502,8 +502,6 @@ def main():
                     "dropout": DROPOUT,
                     "weight_decay": WEIGHT_DECAY,
                     "loss_type": "CrossEntropyLoss",
-                    "augmentations_enabled": ENABLE_AUGMENTATIONS,
-                    "augmentation_type": AUGMENTATION_TYPE if ENABLE_AUGMENTATIONS else "none",
                 }
             )
 
