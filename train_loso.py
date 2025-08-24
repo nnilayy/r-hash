@@ -141,7 +141,7 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-3
+    INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 1e-5
@@ -159,8 +159,8 @@ def main():
 
     # AUGMENTATION CONFIG 
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
-    ENABLE_MIXUP = False  # Keep disabled for now
+    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
+    ENABLE_MIXUP = True  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE + augmentations
 
     ################################################################################
