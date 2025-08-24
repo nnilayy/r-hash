@@ -135,7 +135,7 @@ def main():
     # (Removed K-Fold; using pure LOSO)
 
     # Initial batch size, First half of training
-    INITIAL_BATCH_SIZE = 256
+    INITIAL_BATCH_SIZE = 128
 
     # Reduced batch size, Second half of training
     REDUCED_BATCH_SIZE = 64
@@ -144,12 +144,12 @@ def main():
     INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
-    MINIMUM_LEARNING_RATE = 1e-5
+    MINIMUM_LEARNING_RATE = 5e-4
 
     # Weight decay for regularization
     WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.0
+    LABEL_SMOOTHING = 0.12
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -191,7 +191,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.2
+    DROPOUT = 0.25
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
