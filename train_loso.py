@@ -160,7 +160,7 @@ def main():
     # AUGMENTATION CONFIG 
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
-    ENABLE_MIXUP = True  # Keep disabled for now
+    ENABLE_MIXUP = False  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE + augmentations
 
     ################################################################################
