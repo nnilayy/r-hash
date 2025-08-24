@@ -141,7 +141,7 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-4
+    INITIAL_LEARNING_RATE = 1e-3
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 1e-5
@@ -191,7 +191,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.25
+    DROPOUT = 0.2
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
