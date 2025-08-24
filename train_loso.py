@@ -150,7 +150,7 @@ def main():
     WEIGHT_DECAY = 1e-3
 
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.12
+    LABEL_SMOOTHING = 0.0
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
