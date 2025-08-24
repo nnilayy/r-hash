@@ -4,3 +4,7 @@ ruff
 *__pycache__/
 *.ipynb
 .env
+
+# Large dataset files (too big for GitHub)
+preprocessed_datasets/*.pkl
+*.pkl

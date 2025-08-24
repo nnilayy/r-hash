@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class ILSS:
     """
     ILSS: Inverse Logarithmic Stability Score.
@@ -37,7 +36,7 @@ class ILSS:
         self.lambda_ = lambda_
         self.epsilon = epsilon
 
-    def compute_ilss(self, mean_accuracy: float, std_dev: float) -> float:
+    def compute(self, mean_accuracy: float, std_dev: float) -> float:
         """
         Compute the ILSS value based on mean accuracy and standard deviation.
 
