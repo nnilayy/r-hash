@@ -24,10 +24,16 @@ class AugmentedDatasetReshape(Dataset):
             seed: Random seed for augmentations
         """
         # Reshape data same as original DatasetReshape
-        self.X = torch.tensor(
-            X.reshape(-1, num_electrodes, 4), dtype=torch.float32
-        ).squeeze(1)
+        # Handle both squeezed and unsqueezed cases
+        X_reshaped = X.reshape(-1, num_electrodes, 4)
+        if len(X_reshaped.shape) == 4:  # If there's an extra dimension
+            X_reshaped = X_reshaped.squeeze(1)
+            
+        self.X = torch.tensor(X_reshaped, dtype=torch.float32)
         self.y = torch.tensor(y, dtype=torch.long)
+        
+        # Debug info
+        print(f"AugmentedDatasetReshape: X shape {X.shape} -> {self.X.shape}, y shape {y.shape} -> {self.y.shape}")
         
         # Augmentation setup
         self.apply_augmentations = apply_augmentations
@@ -86,10 +92,23 @@ class MixupAugmentedDataset(Dataset):
                  enable_mixup=True,
                  mixup_alpha=0.2,
                  seed=None):
-        # Base setup
-        self.X = torch.tensor(X.reshape(-1, num_electrodes, 4), dtype=torch.float32).squeeze(1)
+        # Base setup with proper tensor reshaping
+        X_reshaped = X.reshape(-1, num_electrodes, 4)
+        if len(X_reshaped.shape) == 4:  # If there's an extra dimension
+            X_reshaped = X_reshaped.squeeze(1)
+            
+        self.X = torch.tensor(X_reshaped, dtype=torch.float32)
         self.y = torch.tensor(y, dtype=torch.long)
-        self.subject_ids = subject_ids
+        self.subject_ids = np.array(subject_ids)  # Ensure it's numpy array
+        
+        # Debug info
+        print(f"MixupAugmentedDataset: X shape {X.shape} -> {self.X.shape}")
+        print(f"Y shape: {y.shape} -> {self.y.shape}")
+        print(f"Subject IDs shape: {len(subject_ids)} -> {self.subject_ids.shape}")
+        
+        # Verify lengths match
+        assert len(self.X) == len(self.y) == len(self.subject_ids), \
+            f"Length mismatch: X={len(self.X)}, y={len(self.y)}, subjects={len(self.subject_ids)}"
         
         # Augmentation setup
         self.apply_augmentations = apply_augmentations
@@ -107,10 +126,13 @@ class MixupAugmentedDataset(Dataset):
         
         # Create subject-wise sample cache for mixup
         self.subject_samples = {}
-        unique_subjects = np.unique(subject_ids)
+        unique_subjects = np.unique(self.subject_ids)
+        print(f"Creating mixup cache for {len(unique_subjects)} subjects")
+        
         for subj in unique_subjects:
-            subj_indices = np.where(subject_ids == subj)[0]
+            subj_indices = np.where(self.subject_ids == subj)[0]
             self.subject_samples[subj] = subj_indices
+            print(f"  Subject {subj}: {len(subj_indices)} samples")
     
     def __len__(self):
         return len(self.X)

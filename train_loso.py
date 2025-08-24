@@ -158,11 +158,11 @@ def main():
     # % of data to randomly drop for regularization
     DATA_DROP_RATIO = 0.10
 
-    # AUGMENTATION CONFIG
-    ENABLE_AUGMENTATIONS = True
-    AUGMENTATION_TYPE = "moderate"  # Options: "conservative", "moderate", "aggressive"
-    ENABLE_MIXUP = True  # Cross-subject mixup
-    REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # If True, removes SMOTE
+    # AUGMENTATION CONFIG (Starting simple)
+    ENABLE_AUGMENTATIONS = False  # Start with disabled to test basic functionality first
+    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
+    ENABLE_MIXUP = False  # Keep disabled
+    REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE
 
     ################################################################################
     # MODEL-CONFIG
@@ -292,42 +292,69 @@ def main():
             # Apply SMOTE to the training set (original approach)
             smote = SMOTE(random_state=SEED_VAL)
             X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
-            # Extend subject groups to match SMOTE-balanced data
-            groups_train_balanced = np.repeat(groups_train, 
-                                            len(y_train_balanced) // len(y_train))
+            
+            # Properly extend subject IDs to match SMOTE output
+            # SMOTE can create varying numbers per class, so we need to map back
+            print(f"Original training size: {len(y_train)}, After SMOTE: {len(y_train_balanced)}")
+            
+            # Simple approach: assign each augmented sample the same subject ID as original
+            # Find which original sample each SMOTE sample corresponds to
+            groups_train_balanced = []
+            for i in range(len(y_train_balanced)):
+                # For SMOTE, we approximate by cycling through original subject IDs
+                original_idx = i % len(groups_train)
+                groups_train_balanced.append(groups_train[original_idx])
+            groups_train_balanced = np.array(groups_train_balanced)
 
         # Create augmented datasets
         if ENABLE_AUGMENTATIONS:
-            if ENABLE_MIXUP:
-                print(f"Creating MixupAugmentedDataset with {AUGMENTATION_TYPE} augmentations")
-                train_dataset = MixupAugmentedDataset(
-                    X_train_balanced, 
-                    y_train_balanced,
-                    groups_train_balanced,
-                    num_electrodes=NUM_ELECTRODES,
-                    apply_augmentations=True,
-                    augmentation_config=AUGMENTATION_TYPE,
-                    enable_mixup=True,
-                    seed=SEED_VAL
-                )
-            else:
-                print(f"Creating AugmentedDatasetReshape with {AUGMENTATION_TYPE} augmentations")
-                train_dataset = AugmentedDatasetReshape(
-                    X_train_balanced, 
-                    y_train_balanced, 
-                    num_electrodes=NUM_ELECTRODES,
-                    apply_augmentations=True,
-                    augmentation_config=AUGMENTATION_TYPE,
-                    seed=SEED_VAL
+            try:
+                if ENABLE_MIXUP:
+                    print(f"Creating MixupAugmentedDataset with {AUGMENTATION_TYPE} augmentations")
+                    # Add validation for dataset creation
+                    print(f"Validation - X_train_balanced: {X_train_balanced.shape}")
+                    print(f"Validation - y_train_balanced: {y_train_balanced.shape}")  
+                    print(f"Validation - groups_train_balanced: {len(groups_train_balanced)}")
+                    
+                    train_dataset = MixupAugmentedDataset(
+                        X_train_balanced, 
+                        y_train_balanced,
+                        groups_train_balanced,
+                        num_electrodes=NUM_ELECTRODES,
+                        apply_augmentations=True,
+                        augmentation_config=AUGMENTATION_TYPE,
+                        enable_mixup=True,
+                        seed=SEED_VAL
+                    )
+                else:
+                    print(f"Creating AugmentedDatasetReshape with {AUGMENTATION_TYPE} augmentations")
+                    train_dataset = AugmentedDatasetReshape(
+                        X_train_balanced, 
+                        y_train_balanced, 
+                        num_electrodes=NUM_ELECTRODES,
+                        apply_augmentations=True,
+                        augmentation_config=AUGMENTATION_TYPE,
+                        seed=SEED_VAL
+                    )
+            except Exception as e:
+                print(f"Error creating augmented dataset: {e}")
+                print("Falling back to standard DatasetReshape")
+                train_dataset = DatasetReshape(
+                    X_train_balanced, y_train_balanced, NUM_ELECTRODES
                 )
         else:
             # Original dataset without augmentations
+            print("Creating standard DatasetReshape (no augmentations)")
             train_dataset = DatasetReshape(
                 X_train_balanced, y_train_balanced, NUM_ELECTRODES
             )
 
         # Validation dataset (always without augmentations)
         val_dataset = DatasetReshape(X_val, y_val, NUM_ELECTRODES)
+        
+        # Print final dataset sizes
+        print(f"Final train dataset size: {len(train_dataset)}")
+        print(f"Final val dataset size: {len(val_dataset)}")
 
         # balanced_counts = Counter(y_train_balanced)
         # print(f"\nFold {fold + 1} Training Set Class Balance (After SMOTE):")
