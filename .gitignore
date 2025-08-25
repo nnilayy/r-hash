@@ -8,3 +8,5 @@ ruff
 # Large dataset files (too big for GitHub)
 preprocessed_datasets/*.pkl
 *.pkl
+README.md
+preprocessed_datasets

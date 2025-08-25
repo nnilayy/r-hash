@@ -144,12 +144,12 @@ def main():
     INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
-    MINIMUM_LEARNING_RATE = 5e-4
+    MINIMUM_LEARNING_RATE = 1e-5
 
     # Weight decay for regularization
     WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.22
+    LABEL_SMOOTHING = 0.25
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -157,7 +157,7 @@ def main():
     # % of data to randomly drop for regularization
     DATA_DROP_RATIO = 0.10
 
-    # AUGMENTATION CONFIG 
+    # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
     ENABLE_MIXUP = False  # Keep disabled for now
