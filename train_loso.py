@@ -141,21 +141,21 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-4
+    INITIAL_LEARNING_RATE = 5e-5
 
     # Minimum learning rate
-    MINIMUM_LEARNING_RATE = 5e-5
+    MINIMUM_LEARNING_RATE = 1e-5
 
     # Weight decay for regularization
-    WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
+    WEIGHT_DECAY = 1e-3  # Increased from 1e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.20
+    LABEL_SMOOTHING = 0.00
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
 
     # % of data to randomly drop for regularization
-    DATA_DROP_RATIO = 0.10
+    DATA_DROP_RATIO = 0.15
 
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
@@ -177,7 +177,7 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 256
+    EMBED_DIM = 512
 
     # Number of InterCorticalAttention Transformer Blocks
     DEPTH = 6
@@ -186,10 +186,10 @@ def main():
     HEADS = 8
 
     # Dim of individual attention head in MHSA
-    HEAD_DIM = 32
+    HEAD_DIM = 64
 
     # Hidden layer dimension of the Feed-Forward Network (FFN)
-    MLP_HIDDEN_DIM = 256
+    MLP_HIDDEN_DIM = 512
 
     # Dropout Prob
     DROPOUT = 0.15
