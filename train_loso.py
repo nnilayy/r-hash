@@ -135,7 +135,7 @@ def main():
     # (Removed K-Fold; using pure LOSO)
 
     # Initial batch size, First half of training
-    INITIAL_BATCH_SIZE = 128
+    INITIAL_BATCH_SIZE = 256
 
     # Reduced batch size, Second half of training
     REDUCED_BATCH_SIZE = 64
@@ -160,7 +160,7 @@ def main():
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
-    AUGMENTATION_PROBABILITY = 0.3  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
+    AUGMENTATION_PROBABILITY = 0.4  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
     ENABLE_MIXUP = False  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE + augmentations
 
