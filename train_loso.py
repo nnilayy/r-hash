@@ -5,6 +5,7 @@ import pickle
 import argparse
 import numpy as np
 import torch.nn as nn
+import math
 from tqdm import tqdm
 # from collections import Counter
 from utils.seed import set_seed
@@ -145,11 +146,14 @@ def main():
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 1e-5
+    
+    # Learning rate warmup epochs for better convergence
+    WARMUP_EPOCHS = 20
 
     # Weight decay for regularization
     WEIGHT_DECAY = 1e-2  # Increased from 1e-3 to 5e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.20
+    LABEL_SMOOTHING = 0.00
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -159,9 +163,9 @@ def main():
 
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
-    AUGMENTATION_PROBABILITY = 0.4  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
-    ENABLE_MIXUP = True  # Keep disabled for now
+    AUGMENTATION_TYPE = "moderate"  # Upgrade from conservative to moderate for plateau breaking
+    AUGMENTATION_PROBABILITY = 0.5  # Increase from 0.4 to 0.5 for more diversity
+    ENABLE_MIXUP = True  # Keep enabled for cross-subject generalization
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
 
     ################################################################################
@@ -177,19 +181,19 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 256
+    EMBED_DIM = 128
 
     # Number of InterCorticalAttention Transformer Blocks
-    DEPTH = 6
+    DEPTH = 4
 
     # Number of parallel attention heads per InterCorticalAttention Transformer Block
-    HEADS = 8
+    HEADS = 6
 
     # Dim of individual attention head in MHSA
     HEAD_DIM = 32
 
     # Hidden layer dimension of the Feed-Forward Network (FFN)
-    MLP_HIDDEN_DIM = 256
+    MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
     DROPOUT = 0.15
@@ -393,14 +397,25 @@ def main():
         )
         model = model.to(DEVICE)
 
-        # loss, optimizer, and scheduler
+        # loss, optimizer, and scheduler with warmup for plateau breaking
         criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
-        # Replace CosineAnnealingLR with ReduceLROnPlateau for better stability with overlapping windows
-        scheduler = lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=15, min_lr=MINIMUM_LEARNING_RATE
+        
+        # Warmup + Cosine Annealing scheduler for better plateau escape
+        def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps):
+            def lr_lambda(current_step):
+                if current_step < num_warmup_steps:
+                    return float(current_step) / float(max(1, num_warmup_steps))
+                progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+                return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+            return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+        
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer, 
+            num_warmup_steps=WARMUP_EPOCHS, 
+            num_training_steps=NUM_EPOCHS
         )
 
         # Init WandB for current fold
@@ -418,7 +433,7 @@ def main():
                 "held_out_subject": held_out_subject,
                 "fold": fold + 1,
                 "optimizer": "AdamW",
-                "scheduler": "ReduceLROnPlateau",
+                "scheduler": "CosineWithWarmup",
                 "augmentations_enabled": ENABLE_AUGMENTATIONS,
                 "augmentation_type": AUGMENTATION_TYPE if ENABLE_AUGMENTATIONS else None,
                 "mixup_enabled": ENABLE_MIXUP if ENABLE_AUGMENTATIONS else False,
@@ -486,8 +501,8 @@ def main():
                     all_targets.extend(y.cpu().numpy())
 
             avg_val_loss = val_loss / len(val_loader)
-            # Update scheduler based on validation loss (ReduceLROnPlateau needs validation loss)
-            scheduler.step(avg_val_loss)
+            # Update scheduler every epoch (CosineWithWarmup doesn't need validation loss)
+            scheduler.step()
 
             # Calculate eval metrics
             val_accuracy = accuracy_score(all_targets, all_preds)

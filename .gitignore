@@ -10,3 +10,4 @@ preprocessed_datasets/*.pkl
 *.pkl
 README.md
 preprocessed_datasets
+wandb
