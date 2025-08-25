@@ -160,8 +160,8 @@ def main():
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
-    AUGMENTATION_PROBABILITY = 0.5  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
-    ENABLE_MIXUP = False  # Keep disabled for now
+    AUGMENTATION_PROBABILITY = 0.3  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
+    ENABLE_MIXUP = True  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
 
     ################################################################################
@@ -177,19 +177,19 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 128
+    EMBED_DIM = 256
 
     # Number of InterCorticalAttention Transformer Blocks
-    DEPTH = 4
+    DEPTH = 6
 
     # Number of parallel attention heads per InterCorticalAttention Transformer Block
-    HEADS = 6
+    HEADS = 8
 
     # Dim of individual attention head in MHSA
     HEAD_DIM = 32
 
     # Hidden layer dimension of the Feed-Forward Network (FFN)
-    MLP_HIDDEN_DIM = 128
+    MLP_HIDDEN_DIM = 256
 
     # Dropout Prob
     DROPOUT = 0.15
