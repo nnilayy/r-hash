@@ -144,7 +144,7 @@ def main():
     INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
-    MINIMUM_LEARNING_RATE = 1e-5
+    MINIMUM_LEARNING_RATE = 5e-5
 
     # Weight decay for regularization
     WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
@@ -159,7 +159,7 @@ def main():
 
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
+    AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
     AUGMENTATION_PROBABILITY = 0.4  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
     ENABLE_MIXUP = False  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE + augmentations
@@ -192,7 +192,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.15
+    DROPOUT = 0.10
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
