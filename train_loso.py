@@ -141,15 +141,15 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 5e-5
+    INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 1e-5
 
     # Weight decay for regularization
-    WEIGHT_DECAY = 1e-3  # Increased from 1e-3 to combat 77% overlap overfitting
+    WEIGHT_DECAY = 1e-3  # Increased from 1e-3 to 5e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.00
+    LABEL_SMOOTHING = 0.20
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -160,7 +160,7 @@ def main():
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
-    AUGMENTATION_PROBABILITY = 0.3  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
+    AUGMENTATION_PROBABILITY = 0.4  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
     ENABLE_MIXUP = True  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
 
@@ -177,7 +177,7 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 512
+    EMBED_DIM = 256
 
     # Number of InterCorticalAttention Transformer Blocks
     DEPTH = 6
@@ -186,10 +186,10 @@ def main():
     HEADS = 8
 
     # Dim of individual attention head in MHSA
-    HEAD_DIM = 64
+    HEAD_DIM = 32
 
     # Hidden layer dimension of the Feed-Forward Network (FFN)
-    MLP_HIDDEN_DIM = 512
+    MLP_HIDDEN_DIM = 256
 
     # Dropout Prob
     DROPOUT = 0.15
@@ -398,8 +398,9 @@ def main():
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
-        scheduler = lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=NUM_EPOCHS, eta_min=MINIMUM_LEARNING_RATE
+        # Replace CosineAnnealingLR with ReduceLROnPlateau for better stability with overlapping windows
+        scheduler = lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.5, patience=15, min_lr=MINIMUM_LEARNING_RATE
         )
 
         # Init WandB for current fold
@@ -417,7 +418,7 @@ def main():
                 "held_out_subject": held_out_subject,
                 "fold": fold + 1,
                 "optimizer": "AdamW",
-                "scheduler": "CosineAnnealingLR",
+                "scheduler": "ReduceLROnPlateau",
                 "augmentations_enabled": ENABLE_AUGMENTATIONS,
                 "augmentation_type": AUGMENTATION_TYPE if ENABLE_AUGMENTATIONS else None,
                 "mixup_enabled": ENABLE_MIXUP if ENABLE_AUGMENTATIONS else False,
@@ -426,10 +427,8 @@ def main():
         )
 
         for epoch in range(NUM_EPOCHS):
-            if epoch < 150:
-                current_batch_size = INITIAL_BATCH_SIZE
-            else:
-                current_batch_size = REDUCED_BATCH_SIZE
+            # Use consistent batch size throughout training (removed dynamic batch size change)
+            current_batch_size = INITIAL_BATCH_SIZE
 
             train_loader = DataLoader(
                 train_dataset,
@@ -454,6 +453,10 @@ def main():
                 outputs = model(x)
                 loss = criterion(outputs, y)
                 loss.backward()
+                
+                # Add gradient clipping to prevent exploding gradients from 77% window overlap
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                
                 optimizer.step()
 
                 train_loss += loss.item()
@@ -483,7 +486,8 @@ def main():
                     all_targets.extend(y.cpu().numpy())
 
             avg_val_loss = val_loss / len(val_loader)
-            scheduler.step()
+            # Update scheduler based on validation loss (ReduceLROnPlateau needs validation loss)
+            scheduler.step(avg_val_loss)
 
             # Calculate eval metrics
             val_accuracy = accuracy_score(all_targets, all_preds)

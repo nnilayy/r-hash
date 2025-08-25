@@ -13,3 +13,9 @@ config: {'learning_rate': 5e-05, 'minimum_learning_rate': 1e-05, 'num_epochs': 3
 2025-08-25 15:31:24,029 INFO    MainThread:31288 [wandb_init.py:init():882] backend started and connected
 2025-08-25 15:31:24,031 INFO    MainThread:31288 [wandb_init.py:init():953] updated telemetry
 2025-08-25 15:31:24,086 INFO    MainThread:31288 [wandb_init.py:init():977] communicating run to backend with 90.0 second timeout
+2025-08-25 15:31:25,302 INFO    MainThread:31288 [wandb_init.py:init():1029] starting run threads in backend
+2025-08-25 15:31:25,524 INFO    MainThread:31288 [wandb_run.py:_console_start():2458] atexit reg
+2025-08-25 15:31:25,525 INFO    MainThread:31288 [wandb_run.py:_redirect():2306] redirect: wrap_raw
+2025-08-25 15:31:25,525 INFO    MainThread:31288 [wandb_run.py:_redirect():2375] Wrapping output streams.
+2025-08-25 15:31:25,525 INFO    MainThread:31288 [wandb_run.py:_redirect():2398] Redirects installed.
+2025-08-25 15:31:25,531 INFO    MainThread:31288 [wandb_init.py:init():1075] run started, returning control to user process
