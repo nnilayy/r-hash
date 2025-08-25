@@ -149,7 +149,7 @@ def main():
     # Weight decay for regularization
     WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.12
+    LABEL_SMOOTHING = 0.22
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -191,7 +191,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.3
+    DROPOUT = 0.15
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
