@@ -159,7 +159,7 @@ def main():
 
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
+    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
     AUGMENTATION_PROBABILITY = 0.4  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
     ENABLE_MIXUP = True  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
