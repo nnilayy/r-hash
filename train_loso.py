@@ -145,7 +145,7 @@ def main():
     INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
-    MINIMUM_LEARNING_RATE = 1e-5
+    MINIMUM_LEARNING_RATE = 5e-5
     
     # Learning rate warmup epochs for better convergence
     WARMUP_EPOCHS = 20
@@ -163,7 +163,7 @@ def main():
 
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "moderate"  # Upgrade from conservative to moderate for plateau breaking
+    AUGMENTATION_TYPE = "aggressive"  # Upgrade from conservative to aggressive for plateau breaking
     AUGMENTATION_PROBABILITY = 0.5  # Increase from 0.4 to 0.5 for more diversity
     ENABLE_MIXUP = True  # Keep enabled for cross-subject generalization
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
@@ -196,7 +196,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.15
+    DROPOUT = 0.10
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
