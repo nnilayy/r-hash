@@ -84,6 +84,11 @@ class EEGAugmentationSuite:
         Returns:
             Augmented features
         """
+        # Check augmentation probability - only augment some samples
+        aug_prob = config.get('augmentation_probability', 1.0)  # Default: augment all
+        if random.random() > aug_prob:
+            return x  # Skip augmentation for this sample
+        
         if config.get('gaussian_noise', False):
             x = self.gaussian_noise(x, **config.get('gaussian_noise_params', {}))
         
@@ -110,6 +115,7 @@ class EEGAugmentationSuite:
 AUGMENTATION_CONFIGS = {
     'conservative': {
         # Conservative: 20% of natural variation for stable training
+        'augmentation_probability': 0.3,  # Apply to only 30% of samples
         'gaussian_noise': True,
         'gaussian_noise_params': {'noise_std': 0.20},  # 20% of natural std
         'amplitude_scaling': True,
@@ -118,6 +124,7 @@ AUGMENTATION_CONFIGS = {
     
     'moderate': {
         # Moderate: 50% of natural variation for cross-dataset generalization
+        'augmentation_probability': 0.5,  # Apply to 50% of samples (balanced)
         'gaussian_noise': True,
         'gaussian_noise_params': {'noise_std': 0.50},  # 50% of natural std
         'frequency_band_noise': True,
@@ -131,6 +138,7 @@ AUGMENTATION_CONFIGS = {
     'aggressive': {
         # Aggressive: Full natural variation - bridges all dataset gaps
         # Can transform DEAP (-4.2,4.9) ↔ SEED (-10.9,4.8) ↔ DREAMER (-7.1,7.8)
+        'augmentation_probability': 0.4,  # Apply to only 40% - keep 60% original
         'gaussian_noise': True,
         'gaussian_noise_params': {'noise_std': 1.00},  # Full natural std variation
         'frequency_band_noise': True,

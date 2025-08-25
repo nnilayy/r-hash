@@ -160,6 +160,7 @@ def main():
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
+    AUGMENTATION_PROBABILITY = 0.3  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
     ENABLE_MIXUP = False  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = False  # Keep SMOTE + augmentations
 
@@ -308,6 +309,13 @@ def main():
         # Create augmented datasets
         if ENABLE_AUGMENTATIONS:
             try:
+                # Create custom config with controlled augmentation probability
+                from augmentations import AUGMENTATION_CONFIGS
+                custom_config = AUGMENTATION_CONFIGS[AUGMENTATION_TYPE].copy()
+                custom_config['augmentation_probability'] = AUGMENTATION_PROBABILITY
+                
+                print(f"Using {AUGMENTATION_TYPE} augmentations on {AUGMENTATION_PROBABILITY*100:.0f}% of samples")
+                
                 if ENABLE_MIXUP:
                     print(f"Creating MixupAugmentedDataset with {AUGMENTATION_TYPE} augmentations")
                     # Add validation for dataset creation
@@ -321,7 +329,7 @@ def main():
                         groups_train_balanced,
                         num_electrodes=NUM_ELECTRODES,
                         apply_augmentations=True,
-                        augmentation_config=AUGMENTATION_TYPE,
+                        augmentation_config=custom_config,  # Use custom config
                         enable_mixup=True,
                         seed=SEED_VAL
                     )
@@ -332,7 +340,7 @@ def main():
                         y_train_balanced, 
                         num_electrodes=NUM_ELECTRODES,
                         apply_augmentations=True,
-                        augmentation_config=AUGMENTATION_TYPE,
+                        augmentation_config=custom_config,  # Use custom config
                         seed=SEED_VAL
                     )
             except Exception as e:
