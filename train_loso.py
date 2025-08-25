@@ -341,6 +341,7 @@ def main():
                         num_electrodes=NUM_ELECTRODES,
                         apply_augmentations=True,
                         augmentation_config=custom_config,  # Use custom config
+                        subject_ids=groups_train_balanced,  # Pass subject IDs for group-wise augmentation
                         seed=SEED_VAL
                     )
             except Exception as e:

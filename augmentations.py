@@ -74,20 +74,26 @@ class EEGAugmentationSuite:
         mixed = lam * x1 + (1 - lam) * x2
         return mixed, lam
     
-    def custom_augmentation(self, x: np.ndarray, config: Dict[str, any]) -> np.ndarray:
+    def custom_augmentation(self, x: np.ndarray, config: Dict[str, any], should_augment: bool = None) -> np.ndarray:
         """
         Apply augmentations based on configuration dictionary.
         
         Args:
             x: Input BDE features (num_electrodes, 4)
             config: Dictionary specifying which augmentations to apply
+            should_augment: If provided, overrides probability-based decision
         Returns:
             Augmented features
         """
-        # Check augmentation probability - only augment some samples
-        aug_prob = config.get('augmentation_probability', 1.0)  # Default: augment all
-        if random.random() > aug_prob:
-            return x  # Skip augmentation for this sample
+        # Use explicit decision if provided, otherwise use probability
+        if should_augment is not None:
+            if not should_augment:
+                return x  # Skip augmentation for this sample
+        else:
+            # Fallback to old random probability method
+            aug_prob = config.get('augmentation_probability', 1.0)  # Default: augment all
+            if random.random() > aug_prob:
+                return x  # Skip augmentation for this sample
         
         if config.get('gaussian_noise', False):
             x = self.gaussian_noise(x, **config.get('gaussian_noise_params', {}))
