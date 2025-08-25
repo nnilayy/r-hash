@@ -141,7 +141,7 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-3
+    INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 5e-5
@@ -149,7 +149,7 @@ def main():
     # Weight decay for regularization
     WEIGHT_DECAY = 5e-3  # Increased from 1e-3 to combat 77% overlap overfitting
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.25
+    LABEL_SMOOTHING = 0.20
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -159,8 +159,8 @@ def main():
 
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "conservative"  # "conservative", "moderate", "aggressive"
-    AUGMENTATION_PROBABILITY = 0.4  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
+    AUGMENTATION_TYPE = "moderate"  # "conservative", "moderate", "aggressive"
+    AUGMENTATION_PROBABILITY = 0.5  # What % of samples to augment (0.3=30%, 0.5=50%, etc.)
     ENABLE_MIXUP = False  # Keep disabled for now
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
 
