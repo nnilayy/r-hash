@@ -136,7 +136,7 @@ def main():
     # (Removed K-Fold; using pure LOSO)
 
     # Initial batch size, First half of training
-    INITIAL_BATCH_SIZE = 256
+    INITIAL_BATCH_SIZE = 1024
 
     # Reduced batch size, Second half of training
     REDUCED_BATCH_SIZE = 64
@@ -151,7 +151,7 @@ def main():
     WARMUP_EPOCHS = 20
 
     # Weight decay for regularization
-    WEIGHT_DECAY = 1e-2  # Increased from 1e-3 to 5e-3 to combat 77% overlap overfitting
+    WEIGHT_DECAY = 1e-2
     # Label smoothing for loss function
     LABEL_SMOOTHING = 0.00
 
@@ -164,7 +164,7 @@ def main():
     # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
     ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
     AUGMENTATION_TYPE = "aggressive"  # Upgrade from conservative to aggressive for plateau breaking
-    AUGMENTATION_PROBABILITY = 0.5  # Increase from 0.4 to 0.5 for more diversity
+    AUGMENTATION_PROBABILITY = 0.3  # Increase from 0.4 to 0.5 for more diversity
     ENABLE_MIXUP = True  # Keep enabled for cross-subject generalization
     REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
 
@@ -196,7 +196,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.10
+    DROPOUT = 0.2
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
