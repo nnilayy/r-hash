@@ -19,15 +19,12 @@ import torch.optim.lr_scheduler as lr_scheduler
 from utils.messages import success, fail
 from utils.pickle_patch import patch_pickle_loading
 from preprocessing.transformations import DatasetReshape
-from dataset_augmentations import AugmentedDatasetReshape, MixupAugmentedDataset
 from utils.auto_detect import get_num_electrodes, get_num_classes
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
 ################################################################################
 # ARGPARSE CONFIGURATION
 ################################################################################
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="RBTransformer EEG Training Script")
     parser.add_argument("--root_dir", type=str, default="preprocessed_datasets")
@@ -85,7 +82,7 @@ def main():
         },
         "seed": {
             "multi": {
-                "emotion": "seed_multi_emotion_dataset.pkl",
+                "emotion": "seed_multi_dataset_no_overlap.pkl",
             },
         },
     }
@@ -136,10 +133,7 @@ def main():
     # (Removed K-Fold; using pure LOSO)
 
     # Initial batch size, First half of training
-    INITIAL_BATCH_SIZE = 1024
-
-    # Reduced batch size, Second half of training
-    REDUCED_BATCH_SIZE = 64
+    BATCH_SIZE = 128
 
     # Starting learning rate
     INITIAL_LEARNING_RATE = 1e-4
@@ -159,14 +153,7 @@ def main():
     NUM_WORKERS = args.num_workers
 
     # % of data to randomly drop for regularization
-    DATA_DROP_RATIO = 0.15
-
-    # AUGMENTATION CONFIG - BDE-specific augmentations based on 1.4M sample analysis
-    ENABLE_AUGMENTATIONS = True  # Enable augmentations to reduce overfitting
-    AUGMENTATION_TYPE = "aggressive"  # Upgrade from conservative to aggressive for plateau breaking
-    AUGMENTATION_PROBABILITY = 0.3  # Increase from 0.4 to 0.5 for more diversity
-    ENABLE_MIXUP = True  # Keep enabled for cross-subject generalization
-    REPLACE_SMOTE_WITH_AUGMENTATIONS = True  # Keep SMOTE + augmentations
+    DATA_DROP_RATIO = 0
 
     ################################################################################
     # MODEL-CONFIG
@@ -181,7 +168,7 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 128
+    EMBED_DIM = 192
 
     # Number of InterCorticalAttention Transformer Blocks
     DEPTH = 4
@@ -217,7 +204,7 @@ def main():
     PAPER_TASK = "α-rbtransformer-eeg-recognition"
     TASK_TYPE_SUFFIX = "class-classification"
     RUN_TAG = "loso-sota-run"
-    RUN_ID = "0001"
+    RUN_ID = "0023"
     WANDB_RUN_NAME = f"{PAPER_TASK}-{DATASET_NAME}-{CLASSIFICATION_TYPE}-{DIMENSION}-{TASK_TYPE_SUFFIX}-{RUN_TAG}-{RUN_ID}"
 
     # HF: Key and Login
@@ -250,22 +237,10 @@ def main():
     y_full = np.array(y_full)
     groups = np.array(groups)  # Convert groups to numpy array
 
-    # Data dropout is disabled for LOSO to keep full data collection
-    # num_samples = len(X_full)
-    # drop_count = int(num_samples * DATA_DROP_RATIO)
-    # all_indices = np.arange(num_samples)
-
-    # np.random.shuffle(all_indices)
-    # kept_indices = all_indices[drop_count:]
-    # X_full = X_full[kept_indices]
-    # y_full = y_full[kept_indices]
 
     ################################################################################
     # LOSO (LEAVE-ONE-SUBJECT-OUT) TRAINING
-    ################################################################################
-    # Comment out old K-Fold approach
-    # kf = KFold(n_splits=KFOLDS, shuffle=True, random_state=SEED_VAL)
-    
+    ################################################################################    
     # New LOSO Cross-Validation
     logo = LeaveOneGroupOut()
     n_splits = logo.get_n_splits(X_full, y_full, groups)
@@ -283,83 +258,11 @@ def main():
         X_val = X_full[val_idx]
         y_val = y_full[val_idx]
 
-        # Extract subject IDs for training set (for mixup)
-        groups_train = groups[train_idx]
-
-        # Data balancing: SMOTE vs Augmentations
-        if REPLACE_SMOTE_WITH_AUGMENTATIONS:
-            # Use augmentations instead of SMOTE
-            print(f"Using augmentations instead of SMOTE for balancing")
-            X_train_balanced, y_train_balanced = X_train, y_train
-            groups_train_balanced = groups_train
-        else:
-            # Apply SMOTE to the training set (original approach)
-            smote = SMOTE(random_state=SEED_VAL)
-            X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
-            
-            # Properly extend subject IDs to match SMOTE output
-            # SMOTE can create varying numbers per class, so we need to map back
-            print(f"Original training size: {len(y_train)}, After SMOTE: {len(y_train_balanced)}")
-            
-            # Simple approach: assign each augmented sample the same subject ID as original
-            # Find which original sample each SMOTE sample corresponds to
-            groups_train_balanced = []
-            for i in range(len(y_train_balanced)):
-                # For SMOTE, we approximate by cycling through original subject IDs
-                original_idx = i % len(groups_train)
-                groups_train_balanced.append(groups_train[original_idx])
-            groups_train_balanced = np.array(groups_train_balanced)
-
-        # Create augmented datasets
-        if ENABLE_AUGMENTATIONS:
-            try:
-                # Create custom config with controlled augmentation probability
-                from augmentations import AUGMENTATION_CONFIGS
-                custom_config = AUGMENTATION_CONFIGS[AUGMENTATION_TYPE].copy()
-                custom_config['augmentation_probability'] = AUGMENTATION_PROBABILITY
-                
-                print(f"Using {AUGMENTATION_TYPE} augmentations on {AUGMENTATION_PROBABILITY*100:.0f}% of samples")
-                
-                if ENABLE_MIXUP:
-                    print(f"Creating MixupAugmentedDataset with {AUGMENTATION_TYPE} augmentations")
-                    # Add validation for dataset creation
-                    print(f"Validation - X_train_balanced: {X_train_balanced.shape}")
-                    print(f"Validation - y_train_balanced: {y_train_balanced.shape}")  
-                    print(f"Validation - groups_train_balanced: {len(groups_train_balanced)}")
-                    
-                    train_dataset = MixupAugmentedDataset(
-                        X_train_balanced, 
-                        y_train_balanced,
-                        groups_train_balanced,
-                        num_electrodes=NUM_ELECTRODES,
-                        apply_augmentations=True,
-                        augmentation_config=custom_config,  # Use custom config
-                        enable_mixup=True,
-                        seed=SEED_VAL
-                    )
-                else:
-                    print(f"Creating AugmentedDatasetReshape with {AUGMENTATION_TYPE} augmentations")
-                    train_dataset = AugmentedDatasetReshape(
-                        X_train_balanced, 
-                        y_train_balanced, 
-                        num_electrodes=NUM_ELECTRODES,
-                        apply_augmentations=True,
-                        augmentation_config=custom_config,  # Use custom config
-                        subject_ids=groups_train_balanced,  # Pass subject IDs for group-wise augmentation
-                        seed=SEED_VAL
-                    )
-            except Exception as e:
-                print(f"Error creating augmented dataset: {e}")
-                print("Falling back to standard DatasetReshape")
-                train_dataset = DatasetReshape(
-                    X_train_balanced, y_train_balanced, NUM_ELECTRODES
-                )
-        else:
-            # Original dataset without augmentations
-            print("Creating standard DatasetReshape (no augmentations)")
-            train_dataset = DatasetReshape(
-                X_train_balanced, y_train_balanced, NUM_ELECTRODES
-            )
+        # Create standard (non-augmented) training dataset
+        print("Creating standard DatasetReshape (no augmentations)")
+        train_dataset = DatasetReshape(
+            X_train, y_train, NUM_ELECTRODES
+        )
 
         # Validation dataset (always without augmentations)
         val_dataset = DatasetReshape(X_val, y_val, NUM_ELECTRODES)
@@ -367,6 +270,11 @@ def main():
         # Print final dataset sizes
         print(f"Final train dataset size: {len(train_dataset)}")
         print(f"Final val dataset size: {len(val_dataset)}")
+
+        counts = np.bincount(y_train, minlength=NUM_CLASSES).astype(np.float32)
+        weights = counts.sum() / (NUM_CLASSES * (counts + 1e-6))
+        class_weights = torch.tensor(weights, device=DEVICE, dtype=torch.float32)
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=LABEL_SMOOTHING)
 
         # balanced_counts = Counter(y_train_balanced)
         # print(f"\nFold {fold + 1} Training Set Class Balance (After SMOTE):")
@@ -378,9 +286,11 @@ def main():
 
         val_loader = DataLoader(
             val_dataset,
-            batch_size=INITIAL_BATCH_SIZE,
+            batch_size=BATCH_SIZE,
             shuffle=False,
             num_workers=NUM_WORKERS,
+            pin_memory=True,                    
+            persistent_workers=NUM_WORKERS > 0
         )
 
         # Init RBTransformer and moving it to the device
@@ -398,7 +308,6 @@ def main():
         model = model.to(DEVICE)
 
         # loss, optimizer, and scheduler with warmup for plateau breaking
-        criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
@@ -434,23 +343,22 @@ def main():
                 "fold": fold + 1,
                 "optimizer": "AdamW",
                 "scheduler": "CosineWithWarmup",
-                "augmentations_enabled": ENABLE_AUGMENTATIONS,
-                "augmentation_type": AUGMENTATION_TYPE if ENABLE_AUGMENTATIONS else None,
-                "mixup_enabled": ENABLE_MIXUP if ENABLE_AUGMENTATIONS else False,
-                "smote_replaced_by_augmentations": REPLACE_SMOTE_WITH_AUGMENTATIONS,
             },
         )
 
-        for epoch in range(NUM_EPOCHS):
-            # Use consistent batch size throughout training (removed dynamic batch size change)
-            current_batch_size = INITIAL_BATCH_SIZE
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=BATCH_SIZE,
+            shuffle=True,
+            num_workers=NUM_WORKERS,
+            pin_memory=True,
+            persistent_workers=NUM_WORKERS > 0,
+        )
 
-            train_loader = DataLoader(
-                train_dataset,
-                batch_size=current_batch_size,
-                shuffle=True,
-                num_workers=NUM_WORKERS,
-            )
+        best_metric = -1.0
+        best_state = None
+
+        for epoch in range(NUM_EPOCHS):
 
             # Training loop
             model.train()
@@ -464,12 +372,11 @@ def main():
             ):
                 x, y = batch
                 x, y = x.to(DEVICE), y.to(DEVICE)
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
                 outputs = model(x)
                 loss = criterion(outputs, y)
                 loss.backward()
                 
-                # Add gradient clipping to prevent exploding gradients from 77% window overlap
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 
                 optimizer.step()
@@ -514,6 +421,13 @@ def main():
             )
             f1 = f1_score(all_targets, all_preds, average="macro", zero_division=0)
 
+            # choose your selector:
+            selector = val_accuracy      
+
+            if selector > best_metric:
+                best_metric = selector
+                best_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
+
             # Log config and metrics to WandB
             wandb.log(
                 {
@@ -526,7 +440,7 @@ def main():
                     "recall": recall,
                     "f1_score": f1,
                     "lr": optimizer.param_groups[0]["lr"],
-                    "train_batch_size": current_batch_size,
+                    "train_batch_size": BATCH_SIZE,
                     "dropout": DROPOUT,
                     "weight_decay": WEIGHT_DECAY,
                     "loss_type": "CrossEntropyLoss",
@@ -544,7 +458,10 @@ def main():
             tqdm.write(f"F1 Score       : {f1:.4f}")
             tqdm.write(f"Learning Rate  : {optimizer.param_groups[0]['lr']:.6f}")
             # (Removed focal/EMA logging)            
-            tqdm.write(f"Batch Size     : {current_batch_size}")
+            tqdm.write(f"Batch Size     : {BATCH_SIZE}")
+
+        if best_state is not None:
+            model.load_state_dict(best_state)
 
         # Push model to Hub
         push_model_to_hub(
