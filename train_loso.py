@@ -183,7 +183,7 @@ def main():
     MLP_HIDDEN_DIM = 128
 
     # Dropout Prob
-    DROPOUT = 0.2
+    DROPOUT = 0.01
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
