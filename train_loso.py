@@ -133,10 +133,10 @@ def main():
     # (Removed K-Fold; using pure LOSO)
 
     # Initial batch size, First half of training
-    BATCH_SIZE = 128
+    BATCH_SIZE = 256
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-4
+    INITIAL_LEARNING_RATE = 1e-3
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 5e-5
@@ -167,23 +167,23 @@ def main():
     # BDE Tokens dim
     BDE_DIM = 4
 
-    # Projected dimension of BDE tokens
-    EMBED_DIM = 192
-
     # Number of InterCorticalAttention Transformer Blocks
-    DEPTH = 4
+    DEPTH = 6
 
     # Number of parallel attention heads per InterCorticalAttention Transformer Block
-    HEADS = 6
+    HEADS = 8
 
     # Dim of individual attention head in MHSA
     HEAD_DIM = 32
 
+    # Projected dimension of BDE tokens
+    EMBED_DIM = 256
+
     # Hidden layer dimension of the Feed-Forward Network (FFN)
-    MLP_HIDDEN_DIM = 128
+    MLP_HIDDEN_DIM = 1024
 
     # Dropout Prob
-    DROPOUT = 0.01
+    DROPOUT = 0.15
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
