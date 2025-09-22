@@ -171,19 +171,19 @@ def main():
     INITIAL_LEARNING_RATE = 1e-3
 
     # Minimum learning rate
-    MINIMUM_LEARNING_RATE = 1e-6
+    MINIMUM_LEARNING_RATE = 1e-5
 
     # Weight decay for regularization
     WEIGHT_DECAY = 1e-3
 
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.12
+    LABEL_SMOOTHING = 0.0
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
 
     # % of data to randomly drop for regularization
-    DATA_DROP_RATIO = 0.10
+    DATA_DROP_RATIO = 0.0
 
     ################################################################################
     # MODEL-CONFIG
@@ -198,22 +198,22 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 192
+    EMBED_DIM = 256
 
     # Number of InterCorticalAttention Transformer Blocks
-    DEPTH = 4
+    DEPTH = 6
 
     # Number of parallel attention heads per InterCorticalAttention Transformer Block
-    HEADS = 6
+    HEADS = 8
 
     # Dim of individual attention head in MHSA
     HEAD_DIM = 32
 
     # Hidden layer dimension of the Feed-Forward Network (FFN)
-    MLP_HIDDEN_DIM = 128
+    MLP_HIDDEN_DIM = 1024
 
     # Dropout Prob
-    DROPOUT = 0.1
+    DROPOUT = 0.15
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
