@@ -30,7 +30,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="RBTransformer EEG Training Script")
     parser.add_argument("--root_dir", type=str, default="preprocessed_datasets")
     parser.add_argument(
-        "--dataset_name", type=str, required=True, choices=["seed", "deap", "dreamer", "dreamer_stride_512", "dreamer_stride_256", "dreamer_stride_128", "dreamer_stride_64", "dreamer_stride_32"]
+        "--dataset_name", type=str, required=True, choices=["seed", "deap", "dreamer", "dreamer_window_512", "dreamer_window_256", "dreamer_window_128"]
     )
     parser.add_argument(
         "--task_type", type=str, required=True, choices=["binary", "multi"]
@@ -87,32 +87,21 @@ def main():
                 "emotion": "seed_multi_emotion_dataset.pkl",
             },
         },
-        "dreamer_stride_512": {
+        "dreamer_window_512": {
             "binary": {
-                "arousal": "dreamer_binary_arousal_dataset_stride_512.pkl",
+                "arousal": "dreamer_binary_arousal_dataset_window_512.pkl",
             },
         },
-        "dreamer_stride_256": {
+        "dreamer_window_256": {
             "binary": {
-                "arousal": "dreamer_binary_arousal_dataset_stride_256.pkl",
+                "arousal": "dreamer_binary_arousal_dataset_window_256.pkl",
             },
         },
-        "dreamer_stride_128": {
+        "dreamer_window_128": {
             "binary": {
-                "arousal": "dreamer_binary_arousal_dataset_stride_128.pkl",
+                "arousal": "dreamer_binary_arousal_dataset_window_128.pkl",
             },
         },
-        "dreamer_stride_64": {
-            "binary": {
-                "arousal": "dreamer_binary_arousal_dataset_stride_64.pkl",
-            },
-        },
-        "dreamer_stride_32": {
-            "binary": {
-                "arousal": "dreamer_binary_arousal_dataset_stride_32.pkl",
-            },
-        },
-
     }
 
     # Select Preprocessed Dataset
