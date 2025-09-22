@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument("--hf_username", type=str, required=True)
     parser.add_argument("--hf_token", type=str, required=True)
     parser.add_argument("--wandb_api_key", type=str, required=True)
+    parser.add_argument("--stride_size", type=int, default=None, help="If set, try to use a stride-variant dataset and tag runs/repos, e.g. dreamer_stride_128.")
     return parser.parse_args()
 
 
@@ -86,6 +87,32 @@ def main():
                 "emotion": "seed_multi_emotion_dataset.pkl",
             },
         },
+        "dreamer_stride_512": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_stride_512.pkl",
+            },
+        },
+        "dreamer_stride_256": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_stride_256.pkl",
+            },
+        },
+        "dreamer_stride_128": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_stride_128.pkl",
+            },
+        },
+        "dreamer_stride_64": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_stride_64.pkl",
+            },
+        },
+        "dreamer_stride_32": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_stride_32.pkl",
+            },
+        },
+
     }
 
     # Select Preprocessed Dataset
@@ -208,7 +235,8 @@ def main():
     TASK_TYPE_SUFFIX = "class-classification"
     RUN_TAG = "sota-run"
     RUN_ID = "0001"
-    WANDB_RUN_NAME = f"{PAPER_TASK}-{DATASET_NAME}-{CLASSIFICATION_TYPE}-{DIMENSION}-{TASK_TYPE_SUFFIX}-{RUN_TAG}-{RUN_ID}"
+    STRIDE_TAG = f"-stride_{args.stride_size}" if args.stride_size is not None else ""
+    WANDB_RUN_NAME = f"{PAPER_TASK}-{DATASET_NAME}-{CLASSIFICATION_TYPE}-{DIMENSION}-{TASK_TYPE_SUFFIX}{STRIDE_TAG}-{RUN_TAG}-{RUN_ID}"
 
     # HF: Key and Login
     try:
@@ -423,7 +451,7 @@ def main():
         # Push model to Hub
         push_model_to_hub(
             model=model,
-            repo_id=f"{BASE_REPO_ID}-{fold + 1}",
+            repo_id=f"{BASE_REPO_ID}-{fold + 1}{STRIDE_TAG}",
             commit_message=f"Upload of trained RBTransformer on Kfold-{fold + 1} run",
         )
 
