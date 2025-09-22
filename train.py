@@ -87,6 +87,16 @@ def main():
                 "emotion": "seed_multi_emotion_dataset.pkl",
             },
         },
+        "dreamer_window_2048": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_window_2048.pkl",
+            },
+        },
+        "dreamer_window_1024": {
+            "binary": {
+                "arousal": "dreamer_binary_arousal_dataset_window_1024.pkl",
+            },
+        },
         "dreamer_window_512": {
             "binary": {
                 "arousal": "dreamer_binary_arousal_dataset_window_512.pkl",
