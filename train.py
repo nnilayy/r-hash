@@ -167,7 +167,7 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-3
+    INITIAL_LEARNING_RATE = 1e-4
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 1e-6
