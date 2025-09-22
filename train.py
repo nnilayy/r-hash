@@ -30,7 +30,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="RBTransformer EEG Training Script")
     parser.add_argument("--root_dir", type=str, default="preprocessed_datasets")
     parser.add_argument(
-        "--dataset_name", type=str, required=True, choices=["seed", "deap", "dreamer", "dreamer_window_512", "dreamer_window_256", "dreamer_window_128"]
+        "--dataset_name", type=str, required=True, choices=["seed", "deap", "dreamer", "dreamer_window_2048", "dreamer_window_1024", "dreamer_window_512", "dreamer_window_256", "dreamer_window_128"]
     )
     parser.add_argument(
         "--task_type", type=str, required=True, choices=["binary", "multi"]
