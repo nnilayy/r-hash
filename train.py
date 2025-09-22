@@ -198,7 +198,7 @@ def main():
     BDE_DIM = 4
 
     # Projected dimension of BDE tokens
-    EMBED_DIM = 128
+    EMBED_DIM = 192
 
     # Number of InterCorticalAttention Transformer Blocks
     DEPTH = 4
