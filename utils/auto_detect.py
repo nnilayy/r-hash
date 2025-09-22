@@ -6,6 +6,8 @@ def get_num_electrodes(dataset):
         "seed": 62,
         "deap": 32,
         "dreamer": 14,
+        "dreamer_window_2048": 14,
+        "dreamer_window_1024": 14,
         "dreamer_window_512": 14,
         "dreamer_window_256": 14,
         "dreamer_window_128": 14,
