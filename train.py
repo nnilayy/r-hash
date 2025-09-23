@@ -176,13 +176,13 @@ def main():
     WEIGHT_DECAY = 1e-3
 
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.0
+    LABEL_SMOOTHING = 0.1
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
 
     # % of data to randomly drop for regularization
-    DATA_DROP_RATIO = 0.1
+    DATA_DROP_RATIO = 0.0
 
     ################################################################################
     # MODEL-CONFIG
