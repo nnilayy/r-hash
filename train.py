@@ -167,7 +167,7 @@ def main():
     REDUCED_BATCH_SIZE = 64
 
     # Starting learning rate
-    INITIAL_LEARNING_RATE = 1e-4
+    INITIAL_LEARNING_RATE = 5e-3
 
     # Minimum learning rate
     MINIMUM_LEARNING_RATE = 1e-6
@@ -182,7 +182,7 @@ def main():
     NUM_WORKERS = args.num_workers
 
     # % of data to randomly drop for regularization
-    DATA_DROP_RATIO = 0.0
+    DATA_DROP_RATIO = 0.1
 
     ################################################################################
     # MODEL-CONFIG
@@ -212,7 +212,7 @@ def main():
     MLP_HIDDEN_DIM = 768
 
     # Dropout Prob
-    DROPOUT = 0.05
+    DROPOUT = 0.15
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
