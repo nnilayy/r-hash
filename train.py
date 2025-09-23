@@ -176,7 +176,7 @@ def main():
     WEIGHT_DECAY = 1e-3
 
     # Label smoothing for loss function
-    LABEL_SMOOTHING = 0.1
+    LABEL_SMOOTHING = 0.0
 
     # Number of workers for data loading
     NUM_WORKERS = args.num_workers
@@ -212,7 +212,7 @@ def main():
     MLP_HIDDEN_DIM = 768
 
     # Dropout Prob
-    DROPOUT = 0.15
+    DROPOUT = 0.10
 
     # Device Set (GPU if avail else CPU)
     DEVICE = torch.device(args.device)
@@ -284,7 +284,7 @@ def main():
         X_val = X_full[val_idx]
         y_val = y_full[val_idx]
 
-        # Applying SMOTE to the training set
+    # Applying SMOTE to the training set
         smote = SMOTE(random_state=SEED_VAL)
         X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
 
@@ -322,8 +322,28 @@ def main():
         )
         model = model.to(DEVICE)
 
+        # ----- Class-Balanced (Effective Number) Weights + DRW (Deferred Re-Weighting) -----
+        # Compute class-balanced weights from ORIGINAL training labels (pre-SMOTE)
+        def compute_cb_weights(y_np: np.ndarray, num_classes: int, beta: float = 0.9999) -> np.ndarray:
+            counts = np.bincount(y_np.astype(int), minlength=num_classes)
+            # Guard against zeros to avoid numerical issues
+            safe_counts = np.maximum(counts, 1)
+            eff_num = 1.0 - np.power(beta, safe_counts)
+            weights = (1.0 - beta) / np.maximum(eff_num, 1e-12)
+            # Normalize weights so mean ~ 1 for stable loss scale
+            weights = weights * (num_classes / np.sum(weights))
+            return weights
+
+        CB_BETA = 0.9999
+        DRW_START_RATIO = 0.3  # start re-weighting after 30% of epochs
+        drw_start_epoch = max(1, int(NUM_EPOCHS * DRW_START_RATIO))
+
+        cb_weights_np = compute_cb_weights(y_train, NUM_CLASSES, beta=CB_BETA)
+        cb_weights = torch.tensor(cb_weights_np, dtype=torch.float32, device=DEVICE)
+
         # loss, optimizer, and scheduler
-        criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
+        criterion_unweighted = nn.CrossEntropyLoss()  # no label smoothing
+        criterion_weighted = nn.CrossEntropyLoss(weight=cb_weights)
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
@@ -375,7 +395,11 @@ def main():
                 x, y = x.to(DEVICE), y.to(DEVICE)
                 optimizer.zero_grad()
                 outputs = model(x)
-                loss = criterion(outputs, y)
+                # DRW: use unweighted CE in early phase, then switch to weighted CE
+                if (epoch + 1) >= drw_start_epoch:
+                    loss = criterion_weighted(outputs, y)
+                else:
+                    loss = criterion_unweighted(outputs, y)
                 loss.backward()
                 optimizer.step()
 
@@ -400,7 +424,8 @@ def main():
                     x, y = batch
                     x, y = x.to(DEVICE), y.to(DEVICE)
                     outputs = model(x)
-                    loss = criterion(outputs, y)
+                    # For validation reporting, use unweighted CE for consistency
+                    loss = criterion_unweighted(outputs, y)
                     val_loss += loss.item()
                     _, predicted = torch.max(outputs, 1)
 
@@ -432,6 +457,8 @@ def main():
                     "f1_score": f1,
                     "lr": optimizer.param_groups[0]["lr"],
                     "train_batch_size": current_batch_size,
+                    "drw_active": int((epoch + 1) >= drw_start_epoch),
+                    "cb_beta": CB_BETA,
                 }
             )
 
@@ -446,6 +473,8 @@ def main():
             tqdm.write(f"F1 Score       : {f1:.4f}")
             tqdm.write(f"Learning Rate  : {optimizer.param_groups[0]['lr']:.6f}")
             tqdm.write(f"Batch Size     : {current_batch_size}")
+            if (epoch + 1) == drw_start_epoch:
+                tqdm.write(f"[Info] DRW activated from epoch {drw_start_epoch} (CB beta={CB_BETA})")
 
         # Push model to Hub
         push_model_to_hub(
